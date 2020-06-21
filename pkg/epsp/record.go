@@ -11,6 +11,8 @@ type Record struct {
 	Code      int
 	CreatedAt string `json:"created_at"`
 	Time      string
+	Userquake *Userquake
+	Areapeers *Areapeers
 }
 
 type Userquake struct {
@@ -32,17 +34,9 @@ type Areapeer struct {
 	Peer int
 }
 
-func ParseRecord(body string) (Record, error) {
+func Parse(body string) (Record, error) {
 	r := Record{}
 	err := json.Unmarshal([]byte(body), &r)
-	if err != nil {
-		return r, err
-	}
-	return r, nil
-}
-
-func Parse(body string) (interface{}, error) {
-	r, err := ParseRecord(body)
 	if err != nil {
 		return r, err
 	}
@@ -50,13 +44,19 @@ func Parse(body string) (interface{}, error) {
 	if r.Code == userquake {
 		u := Userquake{}
 		err = json.Unmarshal([]byte(body), &u)
-		return u, err
+
+		if err == nil {
+			r.Userquake = &u
+		}
 	}
 
 	if r.Code == areapeers {
 		a := Areapeers{}
 		err = json.Unmarshal([]byte(body), &a)
-		return a, err
+
+		if err == nil {
+			r.Areapeers = &a
+		}
 	}
 
 	return r, nil

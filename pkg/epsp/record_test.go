@@ -14,7 +14,7 @@ func TestRecord(t *testing.T) {
 	}
 
 	for _, json := range jsons {
-		r, err := ParseRecord(json)
+		r, err := Parse(json)
 		if err != nil {
 			t.Errorf("record (%v) parse error: %v", json, err)
 		}
@@ -29,8 +29,8 @@ func TestUserquake(t *testing.T) {
 		t.Errorf("record (%v) parse error: %v", json, err)
 	}
 
-	u, ok := r.(Userquake)
-	if !ok {
+	u := r.Userquake
+	if u == nil {
 		t.Errorf("record (%v) parse type is not userquake", json)
 	}
 
@@ -48,8 +48,8 @@ func TestAreapeers(t *testing.T) {
 		t.Errorf("record (%v) parse error: %v", json, err)
 	}
 
-	a, ok := r.(Areapeers)
-	if !ok {
+	a := r.Areapeers
+	if a == nil {
 		t.Errorf("record (%v) parse type is not areapeers", json)
 	}
 
