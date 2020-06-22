@@ -1,16 +1,23 @@
 package epsp
 
-import "encoding/json"
+import (
+	"encoding/json"
+	"time"
+)
 
 const earthquake = 551
 const tsunami = 552
 const areapeers = 555
 const userquake = 561
 
+type EPSPTime struct {
+	*time.Time
+}
+
 type Record struct {
 	Code      int
 	CreatedAt string `json:"created_at"`
-	Time      string
+	Time      EPSPTime
 	Userquake *Userquake
 	Areapeers *Areapeers
 }
@@ -18,20 +25,27 @@ type Record struct {
 type Userquake struct {
 	Code      int
 	CreatedAt string `json:"created_at"`
-	Time      string
+	Time      EPSPTime
 	Area      int
 }
 
 type Areapeers struct {
 	Code      int
 	CreatedAt string `json:"created_at"`
-	Time      string
+	Time      EPSPTime
 	Areas     []Areapeer
 }
 
 type Areapeer struct {
 	Id   int
 	Peer int
+}
+
+func (et *EPSPTime) UnmarshalJSON(data []byte) error {
+	loc, _ := time.LoadLocation("Asia/Tokyo")
+	t, err := time.ParseInLocation("\"2006/01/02 15:04:05.999\"", string(data), loc)
+	*et = EPSPTime{&t}
+	return err
 }
 
 func Parse(body string) (Record, error) {

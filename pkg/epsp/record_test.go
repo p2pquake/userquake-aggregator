@@ -34,7 +34,7 @@ func TestUserquake(t *testing.T) {
 		t.Errorf("record (%v) parse type is not userquake", json)
 	}
 
-	if u.Code != 561 || u.Area != 200 || u.CreatedAt != "2020/06/18 14:08:24.777" || u.Time != "2020/06/18 14:08:24.772" {
+	if u.Code != 561 || u.Area != 200 || u.CreatedAt != "2020/06/18 14:08:24.777" || u.Time.UnixNano() != 1592456904772000000 {
 		t.Errorf("userquake (%v) values are wrong", u)
 	}
 
@@ -53,7 +53,7 @@ func TestAreapeers(t *testing.T) {
 		t.Errorf("record (%v) parse type is not areapeers", json)
 	}
 
-	if a.Code != 555 || a.CreatedAt != "2020/05/22 07:54:11.135" || a.Time != "2020/05/22 07:54:11.114" {
+	if a.Code != 555 || a.CreatedAt != "2020/05/22 07:54:11.135" || a.Time.UnixNano() != 1590101651114000000 {
 		t.Errorf("areapeers (%v) values are wrong", a)
 	}
 
