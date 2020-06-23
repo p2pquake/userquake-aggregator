@@ -1,12 +1,13 @@
 package aggregate
 
-import "github.com/p2pquake/userquake-aggregator/pkg/epsp"
+import (
+	"github.com/p2pquake/userquake-aggregator/pkg/epsp"
+)
 
-type StartedAt string
-type Results map[StartedAt]Result
+type Results map[epsp.EPSPTime]Result
 
 type Result struct {
-	StartedAt  StartedAt
+	StartedAt  epsp.EPSPTime
 	Areapeers  epsp.Areapeers
 	Userquakes []epsp.Userquake
 }
