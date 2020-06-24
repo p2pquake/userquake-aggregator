@@ -10,6 +10,8 @@ const tsunami = 552
 const areapeers = 555
 const userquake = 561
 
+type AreaCode int
+
 type EPSPTime struct {
 	*time.Time
 }
@@ -26,7 +28,7 @@ type Userquake struct {
 	Code      int
 	CreatedAt string `json:"created_at"`
 	Time      EPSPTime
-	Area      int
+	Area      AreaCode
 }
 
 type Areapeers struct {
@@ -37,7 +39,7 @@ type Areapeers struct {
 }
 
 type Areapeer struct {
-	Id   int
+	Id   AreaCode
 	Peer int
 }
 
