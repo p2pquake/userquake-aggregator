@@ -1,8 +1,6 @@
 package evaluate
 
 import (
-	"log"
-
 	"github.com/p2pquake/userquake-aggregator/pkg/aggregate"
 	"github.com/p2pquake/userquake-aggregator/pkg/epsp"
 )
@@ -159,7 +157,9 @@ var areaPositions map[epsp.AreaCode]position = map[epsp.AreaCode]position{
 type CompatibleEvaluator struct {
 }
 
-func (c CompatibleEvaluator) Evaluate(result aggregate.Result) Result {
-	log.Fatalln("Not implemented")
-	return Result{}
+func (c CompatibleEvaluator) Evaluate(r aggregate.Result) Result {
+	result := Result{Confidence: 0, AreaConfidence: map[epsp.AreaCode]Confidence{}}
+	result.StartedAt = r.StartedAt
+
+	return result
 }
