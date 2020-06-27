@@ -1,6 +1,8 @@
 package evaluate
 
 import (
+	"log"
+
 	"github.com/p2pquake/userquake-aggregator/pkg/aggregate"
 	"github.com/p2pquake/userquake-aggregator/pkg/epsp"
 )
@@ -161,5 +163,71 @@ func (c CompatibleEvaluator) Evaluate(r aggregate.Result) Result {
 	result := Result{Confidence: 0, AreaConfidence: map[epsp.AreaCode]Confidence{}}
 	result.StartedAt = r.StartedAt
 
+	for i := 3; i <= len(r.Userquakes); i++ {
+		u := r.Userquakes[0:i]
+
+		result.Confidence = calcConfidence(r.Areapeers, u)
+	}
+
 	return result
+}
+
+func calcConfidence(p epsp.Areapeers, u []epsp.Userquake) Confidence {
+	speed := float64(len(u)) / (u[len(u)-1].Time.Sub(*u[0].Time.Time)).Seconds()
+	rate := float64(len(u)) / float64(sum(p))
+	areaRate := calcMaxAreaRate(p, u)
+	regionRate := calcMaxRegionRate(p, u)
+
+	factor := []float64{0.875, 1.0, 1.2, 1.4}[2]
+
+	if speed >= 0.25*factor && areaRate >= 0.05*factor {
+		return 1
+	}
+
+	if speed >= 0.15*factor && areaRate >= 0.3*factor {
+		return 1
+	}
+
+	if rate >= 0.01*factor && areaRate >= 0.035*factor {
+		return 1
+	}
+
+	if rate >= 0.006*factor && areaRate >= 0.04*factor && regionRate >= min(1*factor, 1.0) {
+		return 1
+	}
+
+	if speed >= 0.18*factor && areaRate >= 0.04*factor && regionRate >= min(1*factor, 1.0) {
+		return 1
+	}
+
+	return 0
+}
+
+func min(values ...float64) float64 {
+	min := values[0]
+	for _, value := range values {
+		if min > value {
+			min = value
+		}
+	}
+	return min
+}
+
+func sum(p epsp.Areapeers) int {
+	peers := 0
+	for _, a := range p.Areas {
+		peers += a.Peer
+	}
+	return peers
+}
+
+func calcMaxAreaRate(p epsp.Areapeers, u []epsp.Userquake) float64 {
+	log.Fatalln("Not implemented")
+	return 0
+
+}
+
+func calcMaxRegionRate(p epsp.Areapeers, u []epsp.Userquake) float64 {
+	log.Fatalln("Not implemented")
+	return 0
 }
