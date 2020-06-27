@@ -221,13 +221,60 @@ func sum(p epsp.Areapeers) int {
 	return peers
 }
 
-func calcMaxAreaRate(p epsp.Areapeers, u []epsp.Userquake) float64 {
-	log.Fatalln("Not implemented")
-	return 0
+func calcMaxAreaRate(p epsp.Areapeers, us []epsp.Userquake) (rate float64) {
+	rate = 0
 
+	areas, uqs := toMap(p, us, 1)
+	for area, count := range uqs {
+		if area/100 == 9 {
+			continue
+		}
+
+		if peers, ok := areas[area]; ok {
+			if r := float64(count) / float64(peers); r > rate {
+				rate = r
+			}
+		}
+	}
+
+	return
 }
 
-func calcMaxRegionRate(p epsp.Areapeers, u []epsp.Userquake) float64 {
-	log.Fatalln("Not implemented")
-	return 0
+func calcMaxRegionRate(p epsp.Areapeers, us []epsp.Userquake) (rate float64) {
+	rate = 0
+
+	_, uqs := toMap(p, us, 100)
+	for area, count := range uqs {
+		if area/100 == 9 {
+			continue
+		}
+
+		if r := float64(count) / float64(len(us)); r > rate {
+			rate = r
+		}
+	}
+
+	return
+}
+
+func toMap(p epsp.Areapeers, us []epsp.Userquake, mp int) (areas map[epsp.AreaCode]int, uqs map[epsp.AreaCode]int) {
+	areas = map[epsp.AreaCode]int{}
+	for _, a := range p.Areas {
+		id := a.Id / epsp.AreaCode(mp) * epsp.AreaCode(mp)
+		if _, ok := areas[id]; !ok {
+			areas[id] = 0
+		}
+		areas[id]++
+	}
+
+	uqs = map[epsp.AreaCode]int{}
+	for _, u := range us {
+		id := u.Area / epsp.AreaCode(mp) * epsp.AreaCode(mp)
+		if _, ok := uqs[id]; !ok {
+			uqs[id] = 0
+		}
+		uqs[id]++
+	}
+
+	return
 }
