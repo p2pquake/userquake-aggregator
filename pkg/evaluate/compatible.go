@@ -260,31 +260,37 @@ func calcAreaConfidence(p epsp.Areapeers, us []epsp.Userquake) (result map[epsp.
 }
 
 func calcConfidence(p epsp.Areapeers, u []epsp.Userquake) Confidence {
-	speed := float64(len(u)) / (u[len(u)-1].Time.Sub(*u[0].Time.Time)).Seconds()
+	speed := float64(len(u)) / (u[len(u)-1].Time.Time.Sub(*u[0].Time.Time)).Seconds()
 	rate := float64(len(u)) / float64(sum(p))
 	areaRate := calcMaxAreaRate(p, u)
 	regionRate := calcMaxRegionRate(p, u)
 
-	factor := []float64{0.875, 1.0, 1.2, 1.4}[2]
+	confidences := []Confidence{0.97015, 0.96774, 0.97024, 0.98052}
+	factors := []float64{0.875, 1.0, 1.2, 1.4}
 
-	if speed >= 0.25*factor && areaRate >= 0.05*factor {
-		return 1
-	}
+	for i := 3; i >= 0; i-- {
+		factor := factors[i]
+		confidence := confidences[i]
 
-	if speed >= 0.15*factor && areaRate >= 0.3*factor {
-		return 1
-	}
+		if speed >= 0.25*factor && areaRate >= 0.05*factor {
+			return confidence
+		}
 
-	if rate >= 0.01*factor && areaRate >= 0.035*factor {
-		return 1
-	}
+		if speed >= 0.15*factor && areaRate >= 0.3*factor {
+			return confidence
+		}
 
-	if rate >= 0.006*factor && areaRate >= 0.04*factor && regionRate >= minF(1*factor, 1.0) {
-		return 1
-	}
+		if rate >= 0.01*factor && areaRate >= 0.035*factor {
+			return confidence
+		}
 
-	if speed >= 0.18*factor && areaRate >= 0.04*factor && regionRate >= minF(1*factor, 1.0) {
-		return 1
+		if rate >= 0.006*factor && areaRate >= 0.04*factor && regionRate >= minF(1*factor, 1.0) {
+			return confidence
+		}
+
+		if speed >= 0.18*factor && areaRate >= 0.04*factor && regionRate >= minF(1*factor, 1.0) {
+			return confidence
+		}
 	}
 
 	return 0
@@ -371,7 +377,7 @@ func toMap(p epsp.Areapeers, us []epsp.Userquake, mp int) (areas map[epsp.AreaCo
 		if _, ok := areas[id]; !ok {
 			areas[id] = 0
 		}
-		areas[id]++
+		areas[id] += a.Peer
 	}
 
 	uqs = map[epsp.AreaCode]int{}

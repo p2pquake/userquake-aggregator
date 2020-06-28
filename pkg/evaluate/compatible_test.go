@@ -16,6 +16,51 @@ var aps epsp.Areapeers = epsp.Areapeers{
 	},
 }
 
+func TestNotTruly(t *testing.T) {
+	confidence(
+		[]epsp.Userquake{
+			{Area: 101, Time: genTime("2020/01/05 18:00:00.050")},
+			{Area: 101, Time: genTime("2020/01/05 18:00:00.100")},
+		},
+		false,
+		t,
+	)
+}
+
+func TestTruly(t *testing.T) {
+	confidence(
+		[]epsp.Userquake{
+			{Area: 101, Time: genTime("2020/01/05 18:00:00.000")},
+			{Area: 201, Time: genTime("2020/01/05 18:00:20.000")},
+			{Area: 101, Time: genTime("2020/01/05 18:00:24.000")},
+			{Area: 101, Time: genTime("2020/01/05 18:00:24.000")},
+			{Area: 101, Time: genTime("2020/01/05 18:00:24.000")},
+			{Area: 101, Time: genTime("2020/01/05 18:00:24.000")},
+		},
+		true,
+		t,
+	)
+
+	confidence(
+		[]epsp.Userquake{
+			{Area: 101, Time: genTime("2020/01/05 18:00:00.000")},
+			{Area: 201, Time: genTime("2020/01/05 18:00:18.000")},
+			{Area: 101, Time: genTime("2020/01/05 18:00:20.000")},
+			{Area: 101, Time: genTime("2020/01/05 18:00:20.000")},
+			{Area: 101, Time: genTime("2020/01/05 18:00:20.000")},
+		},
+		false,
+		t,
+	)
+}
+
+func genTime(t string) epsp.EPSPTime {
+	e := epsp.EPSPTime{}
+	e.UnmarshalJSON([]byte("\"" + t + "\""))
+	return e
+}
+
+// FIXME: レベルごとに判定できるようになっていない.
 func confidence(uqs []epsp.Userquake, expect bool, t *testing.T) {
 	r := aggregate.Result{
 		StartedAt:  uqs[0].Time,
@@ -29,21 +74,4 @@ func confidence(uqs []epsp.Userquake, expect bool, t *testing.T) {
 		(result.Confidence <= 0 && expect) {
 		t.Errorf("Confidence got %v; want %v", result.Confidence, expect)
 	}
-}
-
-func TestNotTruly(t *testing.T) {
-	confidence(
-		[]epsp.Userquake{
-			{Area: 101, Time: genTime("2020/01/05 18:00:00.050")},
-			{Area: 101, Time: genTime("2020/01/05 18:00:00.100")},
-		},
-		false,
-		t,
-	)
-}
-
-func genTime(t string) epsp.EPSPTime {
-	e := epsp.EPSPTime{}
-	e.UnmarshalJSON([]byte(t))
-	return e
 }
