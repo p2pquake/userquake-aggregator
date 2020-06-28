@@ -1,8 +1,6 @@
 package evaluate
 
 import (
-	"log"
-
 	"github.com/p2pquake/userquake-aggregator/pkg/aggregate"
 	"github.com/p2pquake/userquake-aggregator/pkg/epsp"
 )
@@ -165,11 +163,100 @@ func (c CompatibleEvaluator) Evaluate(r aggregate.Result) Result {
 
 	for i := 3; i <= len(r.Userquakes); i++ {
 		u := r.Userquakes[0:i]
-
-		result.Confidence = calcConfidence(r.Areapeers, u)
+		if c := calcConfidence(r.Areapeers, u); c > result.Confidence {
+			result.Confidence = c
+		}
 	}
 
+	result.AreaConfidence = calcAreaConfidence(r.Areapeers, r.Userquakes)
+
 	return result
+}
+
+func calcAreaConfidence(p epsp.Areapeers, us []epsp.Userquake) (result map[epsp.AreaCode]Confidence) {
+	result = map[epsp.AreaCode]Confidence{}
+
+	// 先頭 2 件はかならず表示対象とする
+	for _, u := range us[0:2] {
+		result[u.Area] = 0
+	}
+
+	// 表示判定
+	for i := 3; i <= len(us); i++ {
+		u := us[0:i]
+
+		// 座標による
+		xs := []int{}
+		ys := []int{}
+		for k := range result {
+			xs = append(xs, areaPositions[k].x)
+			ys = append(ys, areaPositions[k].y)
+		}
+
+		left := min(xs)
+		right := max(xs)
+		top := min(ys)
+		bottom := max(ys)
+
+		if pos, ok := areaPositions[u[len(u)-1].Area]; ok {
+			if pos.x >= left-allowXRange && pos.x <= right+allowXRange &&
+				pos.y >= top-allowYRange && pos.y <= bottom+allowYRange {
+				result[u[len(u)-1].Area] = 0
+			}
+		}
+		// 発信数による
+		areas, uqs := toMap(p, u, 1)
+		for k, count := range uqs {
+			peers, ok := areas[k]
+			if !ok {
+				continue
+			}
+
+			if _, ok := result[k]; !ok {
+				continue
+			}
+
+			if (count >= 3 && float64(count)/float64(peers) >= 0.5) ||
+				(count >= 5 && float64(count)/float64(peers) >= 0.1) {
+				result[k] = 0
+			}
+		}
+	}
+
+	for i := 3; i <= len(us); i++ {
+		pArea, uArea := toMap(p, us[0:i], 1)
+		pPref, uPref := toMap(p, us[0:i], 10)
+		pRegion, uRegion := toMap(p, us[0:i], 100)
+
+		for area, count := range uArea {
+			if _, ok := pArea[area]; !ok {
+				continue
+			}
+
+			if _, ok := result[area]; !ok {
+				continue
+			}
+
+			// 信頼度
+			pc := float64(count) / float64(pArea[area]) * 100
+			if float64(count)/float64(sum(p)) < 0.01 {
+				pc *= float64(count) / float64(sum(p)) * 100
+			} else {
+				pc *= 1.2
+			}
+
+			pc *= float64(uPref[area/10*10])/float64(pPref[area/10*10])*5 + 1
+			pc *= float64(uRegion[area/100*100])/float64(pRegion[area/100*100])*5 + 1
+			pc = minF(pc, 100)
+			if pc < 0 {
+				pc = 0
+			}
+
+			result[area] = Confidence(pc / 100)
+		}
+	}
+
+	return
 }
 
 func calcConfidence(p epsp.Areapeers, u []epsp.Userquake) Confidence {
@@ -192,18 +279,38 @@ func calcConfidence(p epsp.Areapeers, u []epsp.Userquake) Confidence {
 		return 1
 	}
 
-	if rate >= 0.006*factor && areaRate >= 0.04*factor && regionRate >= min(1*factor, 1.0) {
+	if rate >= 0.006*factor && areaRate >= 0.04*factor && regionRate >= minF(1*factor, 1.0) {
 		return 1
 	}
 
-	if speed >= 0.18*factor && areaRate >= 0.04*factor && regionRate >= min(1*factor, 1.0) {
+	if speed >= 0.18*factor && areaRate >= 0.04*factor && regionRate >= minF(1*factor, 1.0) {
 		return 1
 	}
 
 	return 0
 }
 
-func min(values ...float64) float64 {
+func max(values []int) int {
+	v := values[0]
+	for _, e := range values {
+		if e > v {
+			v = e
+		}
+	}
+	return v
+}
+
+func min(values []int) int {
+	v := values[0]
+	for _, e := range values {
+		if v > e {
+			v = e
+		}
+	}
+	return v
+}
+
+func minF(values ...float64) float64 {
 	min := values[0]
 	for _, value := range values {
 		if min > value {
