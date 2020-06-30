@@ -16,18 +16,20 @@ var aps epsp.Areapeers = epsp.Areapeers{
 	},
 }
 
+var confidences []Confidence = []Confidence{0.97015, 0.96774, 0.97024, 0.98052}
+
 func TestNotTruly(t *testing.T) {
 	confidence(
 		[]epsp.Userquake{
 			{Area: 101, Time: genTime("2020/01/05 18:00:00.050")},
 			{Area: 101, Time: genTime("2020/01/05 18:00:00.100")},
 		},
-		false,
+		0,
 		t,
 	)
 }
 
-func TestTruly(t *testing.T) {
+func TestType1(t *testing.T) {
 	confidence(
 		[]epsp.Userquake{
 			{Area: 101, Time: genTime("2020/01/05 18:00:00.000")},
@@ -37,7 +39,7 @@ func TestTruly(t *testing.T) {
 			{Area: 101, Time: genTime("2020/01/05 18:00:24.000")},
 			{Area: 101, Time: genTime("2020/01/05 18:00:24.000")},
 		},
-		true,
+		2,
 		t,
 	)
 
@@ -49,9 +51,89 @@ func TestTruly(t *testing.T) {
 			{Area: 101, Time: genTime("2020/01/05 18:00:20.000")},
 			{Area: 101, Time: genTime("2020/01/05 18:00:20.000")},
 		},
-		false,
+		0,
 		t,
 	)
+}
+
+func TestType2(t *testing.T) {
+	uqs := []epsp.Userquake{}
+	uqs = append(uqs, epsp.Userquake{Area: 101, Time: genTime("2020/01/05 18:00:00.000")})
+	for i := 0; i < 28; i++ {
+		uqs = append(uqs, epsp.Userquake{Area: 101, Time: genTime("2020/01/05 18:03:19.000")})
+	}
+	uqs = append(uqs, epsp.Userquake{Area: 201, Time: genTime("2020/01/05 18:03:20.000")})
+	uqs = append(uqs, epsp.Userquake{Area: 101, Time: genTime("2020/01/05 18:03:20.000")})
+	confidence(uqs, 2, t)
+
+	uqs = []epsp.Userquake{}
+	uqs = append(uqs, epsp.Userquake{Area: 101, Time: genTime("2020/01/05 18:00:00.000")})
+	for i := 0; i < 27; i++ {
+		uqs = append(uqs, epsp.Userquake{Area: 101, Time: genTime("2020/01/05 18:03:19.000")})
+	}
+	uqs = append(uqs, epsp.Userquake{Area: 201, Time: genTime("2020/01/05 18:03:20.000")})
+	uqs = append(uqs, epsp.Userquake{Area: 101, Time: genTime("2020/01/05 18:03:20.000")})
+	confidence(uqs, 1, t)
+}
+
+func TestType3(t *testing.T) {
+	uqs := []epsp.Userquake{}
+	uqs = append(uqs, epsp.Userquake{Area: 101, Time: genTime("2020/01/05 18:00:00.000")})
+	for i := 0; i < 94; i++ {
+		uqs = append(uqs, epsp.Userquake{Area: 202, Time: genTime("2020/01/06 18:00:00.000")})
+	}
+	for i := 0; i < 11; i++ {
+		uqs = append(uqs, epsp.Userquake{Area: 201, Time: genTime("2020/01/06 18:00:00.000")})
+	}
+	confidence(uqs, 2, t)
+
+	uqs = []epsp.Userquake{}
+	uqs = append(uqs, epsp.Userquake{Area: 101, Time: genTime("2020/01/05 18:00:00.000")})
+	for i := 0; i < 94; i++ {
+		uqs = append(uqs, epsp.Userquake{Area: 202, Time: genTime("2020/01/06 18:00:00.000")})
+	}
+	for i := 0; i < 10; i++ {
+		uqs = append(uqs, epsp.Userquake{Area: 201, Time: genTime("2020/01/06 18:00:00.000")})
+	}
+	confidence(uqs, 1, t)
+}
+
+func TestType4(t *testing.T) {
+	uqs := []epsp.Userquake{}
+	uqs = append(uqs, epsp.Userquake{Area: 201, Time: genTime("2020/01/05 18:00:00.000")})
+	for i := 0; i < 11; i++ {
+		uqs = append(uqs, epsp.Userquake{Area: 201, Time: genTime("2020/01/06 18:00:00.000")})
+	}
+	for i := 0; i < 52; i++ {
+		uqs = append(uqs, epsp.Userquake{Area: 202, Time: genTime("2020/01/06 18:00:00.000")})
+	}
+	confidence(uqs, 2, t)
+
+	uqs = []epsp.Userquake{}
+	uqs = append(uqs, epsp.Userquake{Area: 201, Time: genTime("2020/01/05 18:00:00.000")})
+	for i := 0; i < 10; i++ {
+		uqs = append(uqs, epsp.Userquake{Area: 201, Time: genTime("2020/01/06 18:00:00.000")})
+	}
+	for i := 0; i < 53; i++ {
+		uqs = append(uqs, epsp.Userquake{Area: 202, Time: genTime("2020/01/06 18:00:00.000")})
+	}
+	confidence(uqs, 1, t)
+}
+
+func TestType5(t *testing.T) {
+	uqs := []epsp.Userquake{}
+	uqs = append(uqs, epsp.Userquake{Area: 101, Time: genTime("2020/01/05 18:00:00.000")})
+	uqs = append(uqs, epsp.Userquake{Area: 101, Time: genTime("2020/01/05 18:00:22.200")})
+	uqs = append(uqs, epsp.Userquake{Area: 101, Time: genTime("2020/01/05 18:00:22.200")})
+	uqs = append(uqs, epsp.Userquake{Area: 101, Time: genTime("2020/01/05 18:00:22.200")})
+	confidence(uqs, 2, t)
+
+	uqs = []epsp.Userquake{}
+	uqs = append(uqs, epsp.Userquake{Area: 101, Time: genTime("2020/01/05 18:00:00.000")})
+	uqs = append(uqs, epsp.Userquake{Area: 101, Time: genTime("2020/01/05 18:00:22.200")})
+	uqs = append(uqs, epsp.Userquake{Area: 101, Time: genTime("2020/01/05 18:00:22.200")})
+	uqs = append(uqs, epsp.Userquake{Area: 102, Time: genTime("2020/01/05 18:00:22.200")})
+	confidence(uqs, 0, t)
 }
 
 func genTime(t string) epsp.EPSPTime {
@@ -60,8 +142,7 @@ func genTime(t string) epsp.EPSPTime {
 	return e
 }
 
-// FIXME: レベルごとに判定できるようになっていない.
-func confidence(uqs []epsp.Userquake, expect bool, t *testing.T) {
+func confidence(uqs []epsp.Userquake, level int, t *testing.T) {
 	r := aggregate.Result{
 		StartedAt:  uqs[0].Time,
 		Areapeers:  aps,
@@ -70,8 +151,11 @@ func confidence(uqs []epsp.Userquake, expect bool, t *testing.T) {
 
 	result := CompatibleEvaluator{}.Evaluate(r)
 
-	if (result.Confidence > 0 && !expect) ||
-		(result.Confidence <= 0 && expect) {
-		t.Errorf("Confidence got %v; want %v", result.Confidence, expect)
+	if level <= 0 && result.Confidence > 0 {
+		t.Errorf("Confidence got %v; want %v", result.Confidence, 0)
+	}
+
+	if level > 0 && result.Confidence < confidences[level-1] {
+		t.Errorf("Confidence got %v; want >= %v", result.Confidence, confidences[level-1])
 	}
 }
