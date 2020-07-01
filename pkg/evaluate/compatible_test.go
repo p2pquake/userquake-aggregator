@@ -142,7 +142,7 @@ func genTime(t string) epsp.EPSPTime {
 	return e
 }
 
-func confidence(uqs []epsp.Userquake, level int, t *testing.T) {
+func confidence(uqs []epsp.Userquake, level int, t *testing.T) Result {
 	r := aggregate.Result{
 		StartedAt:  uqs[0].Time,
 		Areapeers:  aps,
@@ -158,4 +158,6 @@ func confidence(uqs []epsp.Userquake, level int, t *testing.T) {
 	if level > 0 && result.Confidence < confidences[level-1] {
 		t.Errorf("Confidence got %v; want >= %v", result.Confidence, confidences[level-1])
 	}
+
+	return result
 }
