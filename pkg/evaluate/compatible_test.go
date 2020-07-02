@@ -136,6 +136,29 @@ func TestType5(t *testing.T) {
 	confidence(uqs, 0, t)
 }
 
+func TestAreaConfidence(t *testing.T) {
+	result := confidence(
+		[]epsp.Userquake{
+			{Area: 101, Time: genTime("2020/01/05 18:00:00.000")},
+			{Area: 201, Time: genTime("2020/01/05 18:00:20.000")},
+			{Area: 101, Time: genTime("2020/01/05 18:00:24.000")},
+			{Area: 101, Time: genTime("2020/01/05 18:00:24.000")},
+			{Area: 101, Time: genTime("2020/01/05 18:00:24.000")},
+			{Area: 101, Time: genTime("2020/01/05 18:00:24.000")},
+		},
+		2,
+		t,
+	)
+
+	if _, ok := result.AreaConfidence[101]; !ok {
+		t.Error("result(101) not exists; want exist")
+	}
+
+	if _, ok := result.AreaConfidence[201]; !ok {
+		t.Error("result(201) not exists; want exist")
+	}
+}
+
 func genTime(t string) epsp.EPSPTime {
 	e := epsp.EPSPTime{}
 	e.UnmarshalJSON([]byte("\"" + t + "\""))
