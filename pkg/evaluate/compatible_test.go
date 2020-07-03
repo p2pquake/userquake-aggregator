@@ -336,10 +336,13 @@ func TestAreaConfidence(t *testing.T) {
 		t.Errorf("result.AreaConfidence length got %v; want %v", len(result.AreaConfidence), len(confidenceAreas))
 	}
 
-	// TODO: 信頼度の検証をする
 	for _, area := range confidenceAreas {
 		if _, ok := result.AreaConfidence[area]; !ok {
 			t.Errorf("result(%v) not exist; want exist", area)
+		}
+
+		if result.AreaConfidence[area].Display() != "E" {
+			t.Errorf("result(%v).Display got \"%v\"; want \"%v\"", area, result.AreaConfidence[area].Display(), "E")
 		}
 	}
 }
