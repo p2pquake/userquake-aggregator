@@ -7,11 +7,15 @@ type Confidence float64
 type Result struct {
 	StartedAt      epsp.EPSPTime
 	Confidence     Confidence
-	AreaConfidence map[epsp.AreaCode]Confidence
+	AreaConfidence map[epsp.AreaCode]AreaResult
 }
 
 type AreaResult struct {
 	Confidence Confidence
 	Count      int
-	Display    string
+}
+
+func (ar AreaResult) Display() string {
+	index := int(ar.Confidence * 5)
+	return []string{"E", "D", "C", "B", "A", "A"}[index]
 }

@@ -158,7 +158,7 @@ type CompatibleEvaluator struct {
 }
 
 func (c CompatibleEvaluator) Evaluate(r aggregate.Result) Result {
-	result := Result{Confidence: 0, AreaConfidence: map[epsp.AreaCode]Confidence{}}
+	result := Result{Confidence: 0, AreaConfidence: map[epsp.AreaCode]AreaResult{}}
 	result.StartedAt = r.StartedAt
 
 	for i := 3; i <= len(r.Userquakes); i++ {
@@ -173,12 +173,12 @@ func (c CompatibleEvaluator) Evaluate(r aggregate.Result) Result {
 	return result
 }
 
-func calcAreaConfidence(p epsp.Areapeers, us []epsp.Userquake) (result map[epsp.AreaCode]Confidence) {
-	result = map[epsp.AreaCode]Confidence{}
+func calcAreaConfidence(p epsp.Areapeers, us []epsp.Userquake) (result map[epsp.AreaCode]AreaResult) {
+	result = map[epsp.AreaCode]AreaResult{}
 
 	// 先頭 2 件はかならず表示対象とする
 	for _, u := range us[0:2] {
-		result[u.Area] = 0
+		result[u.Area] = AreaResult{Confidence: 0}
 	}
 
 	// 表示判定
@@ -201,7 +201,7 @@ func calcAreaConfidence(p epsp.Areapeers, us []epsp.Userquake) (result map[epsp.
 		if pos, ok := areaPositions[u[len(u)-1].Area]; ok {
 			if pos.x >= left-allowXRange && pos.x <= right+allowXRange &&
 				pos.y >= top-allowYRange && pos.y <= bottom+allowYRange {
-				result[u[len(u)-1].Area] = 0
+				result[u[len(u)-1].Area] = AreaResult{Confidence: 0}
 			}
 		}
 		// 発信数による
@@ -218,7 +218,7 @@ func calcAreaConfidence(p epsp.Areapeers, us []epsp.Userquake) (result map[epsp.
 
 			if (count >= 3 && float64(count)/float64(peers) >= 0.5) ||
 				(count >= 5 && float64(count)/float64(peers) >= 0.1) {
-				result[k] = 0
+				result[k] = AreaResult{Confidence: 0}
 			}
 		}
 	}
@@ -252,9 +252,11 @@ func calcAreaConfidence(p epsp.Areapeers, us []epsp.Userquake) (result map[epsp.
 				pc = 0
 			}
 
-			result[area] = Confidence(pc / 100)
+			result[area] = AreaResult{Confidence: Confidence(pc / 100)}
 		}
 	}
+
+	// FIXME: Count を設定する
 
 	return
 }
