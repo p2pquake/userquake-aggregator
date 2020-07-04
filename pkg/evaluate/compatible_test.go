@@ -331,8 +331,9 @@ func TestAreaConfidence(t *testing.T) {
 	)
 
 	confidenceAreas := []epsp.AreaCode{220, 225, 230, 231, 232, 240, 241, 250, 150, 151, 200, 205, 215, 125, 270, 275, 410}
+	unconfidenceAreas := []epsp.AreaCode{900}
 
-	if len(confidenceAreas) != len(result.AreaConfidence) {
+	if len(confidenceAreas)+len(unconfidenceAreas) != len(result.AreaConfidence) {
 		t.Errorf("result.AreaConfidence length got %v; want %v", len(result.AreaConfidence), len(confidenceAreas))
 	}
 
@@ -343,6 +344,16 @@ func TestAreaConfidence(t *testing.T) {
 
 		if result.AreaConfidence[area].Display() != "E" {
 			t.Errorf("result(%v).Display got \"%v\"; want \"%v\"", area, result.AreaConfidence[area].Display(), "E")
+		}
+	}
+
+	for _, area := range unconfidenceAreas {
+		if _, ok := result.AreaConfidence[area]; !ok {
+			t.Errorf("result(%v) not exist; want exist", area)
+		}
+
+		if result.AreaConfidence[area].Display() != "F" {
+			t.Errorf("result(%v).Display got \"%v\"; want \"%v\"", area, result.AreaConfidence[area].Display(), "F")
 		}
 	}
 }

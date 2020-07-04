@@ -16,6 +16,10 @@ type AreaResult struct {
 }
 
 func (ar AreaResult) Display() string {
+	if ar.Confidence < 0 {
+		return "F"
+	}
+
 	index := int(ar.Confidence * 5)
 	return []string{"E", "D", "C", "B", "A", "A"}[index]
 }

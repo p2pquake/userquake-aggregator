@@ -256,7 +256,14 @@ func calcAreaConfidence(p epsp.Areapeers, us []epsp.Userquake) (result map[epsp.
 		}
 	}
 
-	// FIXME: Count を設定する
+	_, uqs := toMap(p, us, 1)
+	for area, count := range uqs {
+		if ar, ok := result[area]; ok {
+			ar.Count = count
+		} else {
+			result[area] = AreaResult{Confidence: -1, Count: count}
+		}
+	}
 
 	return
 }
