@@ -264,7 +264,7 @@ func calcAreaConfidence(p epsp.Areapeers, us []epsp.Userquake) (result map[epsp.
 	_, uqs := toMap(p, us, 1)
 	for area, count := range uqs {
 		if ar, ok := result[area]; ok {
-			ar.Count = count
+			result[area] = AreaResult{Confidence: ar.Confidence, Count: count}
 		} else {
 			result[area] = AreaResult{Confidence: -1, Count: count}
 		}

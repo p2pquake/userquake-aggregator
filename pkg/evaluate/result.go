@@ -1,6 +1,10 @@
 package evaluate
 
-import "github.com/p2pquake/userquake-aggregator/pkg/epsp"
+import (
+	"encoding/json"
+
+	"github.com/p2pquake/userquake-aggregator/pkg/epsp"
+)
 
 type Confidence float64
 
@@ -22,4 +26,16 @@ func (ar AreaResult) Display() string {
 
 	index := int(ar.Confidence * 5)
 	return []string{"E", "D", "C", "B", "A", "A"}[index]
+}
+
+func (ar AreaResult) MarshalJSON() ([]byte, error) {
+	type Alias AreaResult
+
+	return json.Marshal(&struct {
+		Alias
+		Display string `json:"display"`
+	}{
+		Alias:   (Alias)(ar),
+		Display: ar.Display(),
+	})
 }

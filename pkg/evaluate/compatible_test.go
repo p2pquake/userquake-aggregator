@@ -354,6 +354,10 @@ func TestAreaConfidence(t *testing.T) {
 		if result.AreaConfidence[area].Display() != "E" {
 			t.Errorf("result(%v).Display got \"%v\"; want \"%v\"", area, result.AreaConfidence[area].Display(), "E")
 		}
+
+		if result.AreaConfidence[area].Count <= 0 {
+			t.Errorf("result(%v).Count got \"%v\"; want > 0", area, result.AreaConfidence[area].Count)
+		}
 	}
 
 	for _, area := range unconfidenceAreas {
@@ -363,6 +367,10 @@ func TestAreaConfidence(t *testing.T) {
 
 		if result.AreaConfidence[area].Display() != "F" {
 			t.Errorf("result(%v).Display got \"%v\"; want \"%v\"", area, result.AreaConfidence[area].Display(), "F")
+		}
+
+		if result.AreaConfidence[area].Count <= 0 {
+			t.Errorf("result(%v).Count got \"%v\"; want > 0", area, result.AreaConfidence[area].Count)
 		}
 	}
 }
