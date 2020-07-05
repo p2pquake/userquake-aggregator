@@ -176,6 +176,11 @@ func (c CompatibleEvaluator) Evaluate(r aggregate.Result) Result {
 func calcAreaConfidence(p epsp.Areapeers, us []epsp.Userquake) (result map[epsp.AreaCode]AreaResult) {
 	result = map[epsp.AreaCode]AreaResult{}
 
+	// 3 件未満は評価対象外とする
+	if len(us) < 3 {
+		return result
+	}
+
 	// 先頭 2 件はかならず表示対象とする
 	for _, u := range us[0:2] {
 		result[u.Area] = AreaResult{Confidence: 0}
@@ -269,6 +274,10 @@ func calcAreaConfidence(p epsp.Areapeers, us []epsp.Userquake) (result map[epsp.
 }
 
 func calcConfidence(p epsp.Areapeers, u []epsp.Userquake) Confidence {
+	if len(u) < 3 {
+		return 0
+	}
+
 	speed := float64(len(u)) / (u[len(u)-1].Time.Time.Sub(*u[0].Time.Time)).Seconds()
 	rate := float64(len(u)) / float64(sum(p))
 	areaRate := calcMaxAreaRate(p, u)

@@ -22,6 +22,15 @@ func TestNotTruly(t *testing.T) {
 	confidence(
 		aps,
 		[]epsp.Userquake{
+			{Area: 101, Time: genTime("2020/01/05 18:00:00.000")},
+		},
+		0,
+		t,
+	)
+
+	confidence(
+		aps,
+		[]epsp.Userquake{
 			{Area: 101, Time: genTime("2020/01/05 18:00:00.050")},
 			{Area: 101, Time: genTime("2020/01/05 18:00:00.100")},
 		},
