@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"sort"
 
 	"github.com/p2pquake/userquake-aggregator/pkg/aggregate"
 	"github.com/p2pquake/userquake-aggregator/pkg/epsp"
@@ -51,6 +52,8 @@ func execute(cmd *cobra.Command, args []string) {
 
 		epspRecords[i] = epspRecord
 	}
+
+	sort.Slice(epspRecords, func(i, j int) bool { return epspRecords[i].Time.Time.Before(*epspRecords[j].Time.Time) })
 
 	// aggregate & evaluate
 	aggregationResults := aggregate.CompatibleAggregator{}.Aggregate(epspRecords)
