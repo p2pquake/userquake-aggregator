@@ -32,25 +32,10 @@ func execute(cmd *cobra.Command, args []string) {
 	}
 
 	// parse
-	var records []interface{}
-	err = json.Unmarshal(body, &records)
+	epspRecords := []epsp.Record{}
+	err = json.Unmarshal(body, &epspRecords)
 	if err != nil {
 		log.Fatalf("JSON unmarshal error: %v from %v", err, string(body))
-	}
-
-	epspRecords := make([]epsp.Record, len(records))
-	for i, record := range records {
-		bytes, err := json.Marshal(record)
-		if err != nil {
-			log.Fatalf("JSON marshal error: %v", err)
-		}
-
-		epspRecord, err := epsp.Parse(string(bytes))
-		if err != nil {
-			log.Fatalf("epsp.Parse error: %v", err)
-		}
-
-		epspRecords[i] = epspRecord
 	}
 
 	sort.Slice(epspRecords, func(i, j int) bool { return epspRecords[i].Time.Time.Before(*epspRecords[j].Time.Time) })
