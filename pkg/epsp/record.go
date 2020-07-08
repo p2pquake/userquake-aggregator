@@ -43,6 +43,36 @@ type Areapeer struct {
 	Peer int
 }
 
+func (r *Record) UnmarshalJSON(data []byte) error {
+	type Alias Record
+	var err error
+
+	aux := &struct{ *Alias }{Alias: (*Alias)(r)}
+	if err = json.Unmarshal(data, &aux); err != nil {
+		return err
+	}
+
+	if r.Code == userquake {
+		u := Userquake{}
+		err = json.Unmarshal([]byte(data), &u)
+
+		if err == nil {
+			r.Userquake = &u
+		}
+	}
+
+	if r.Code == areapeers {
+		a := Areapeers{}
+		err = json.Unmarshal([]byte(data), &a)
+
+		if err == nil {
+			r.Areapeers = &a
+		}
+	}
+
+	return err
+}
+
 func (et *EPSPTime) UnmarshalJSON(data []byte) error {
 	loc, _ := time.LoadLocation("Asia/Tokyo")
 	t, err := time.ParseInLocation("\"2006/01/02 15:04:05.999\"", string(data), loc)
