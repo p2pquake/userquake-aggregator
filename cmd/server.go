@@ -1,7 +1,7 @@
 package cmd
 
 import (
-	"github.com/p2pquake/userquake-aggregator/pkg/webif"
+	"github.com/p2pquake/userquake-aggregator/pkg/supplier"
 	"github.com/spf13/cobra"
 )
 
@@ -15,6 +15,6 @@ var serverCmd = &cobra.Command{
 	Use:   "server",
 	Short: "Start as server",
 	Run: func(cmd *cobra.Command, args []string) {
-		webif.Server{}.Start(Port)
+		supplier.Server{}.Start(Port)
 	},
 }

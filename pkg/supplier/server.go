@@ -1,4 +1,4 @@
-package webif
+package supplier
 
 import (
 	"encoding/json"
