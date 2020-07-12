@@ -24,8 +24,8 @@ func (l *Limiter) Run() {
 	// timer がない -> 即実行し timer セット (cool down)
 	// timer がある -> tailing を true に
 	if l.timer == nil {
-		l.timer = time.AfterFunc(time.Duration(l.interval)*time.Second, l.run)
 		l.f()
+		l.timer = time.AfterFunc(time.Duration(l.interval)*time.Second, l.run)
 	} else {
 		l.tailing = true
 	}
@@ -40,7 +40,7 @@ func (l *Limiter) run() {
 	l.timer = nil
 	if l.tailing {
 		l.tailing = false
-		l.timer = time.AfterFunc(time.Duration(l.interval)*time.Second, l.run)
 		l.f()
+		l.timer = time.AfterFunc(time.Duration(l.interval)*time.Second, l.run)
 	}
 }
