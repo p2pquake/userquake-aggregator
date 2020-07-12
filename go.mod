@@ -3,6 +3,7 @@ module github.com/p2pquake/userquake-aggregator
 go 1.14
 
 require (
+	github.com/fatih/structs v1.1.0
 	github.com/gin-gonic/gin v1.6.3
 	github.com/google/go-cmp v0.3.0 // indirect
 	github.com/kelseyhightower/envconfig v1.4.0

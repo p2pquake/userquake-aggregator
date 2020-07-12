@@ -25,10 +25,10 @@ func init() {
 var mongoCmd = &cobra.Command{
 	Use:   "mongo",
 	Short: "Follow MongoDB and insert evaluation results",
-	Run:   run,
+	Run:   mongoRun,
 }
 
-func run(cmd *cobra.Command, args []string) {
+func mongoRun(cmd *cobra.Command, args []string) {
 	var config Config
 	err := envconfig.Process("", &config)
 	if err != nil {
