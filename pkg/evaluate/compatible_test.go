@@ -398,5 +398,17 @@ func confidence(aps epsp.Areapeers, uqs []epsp.Userquake, level int, t *testing.
 		t.Errorf("Confidence got %v; want >= %v", result.Confidence, confidences[level-1])
 	}
 
+	if result.StartedAt != uqs[0].Time {
+		t.Errorf("StartedAt got %v; want %v", result.StartedAt, uqs[0].Time)
+	}
+
+	if result.UpdatedAt != uqs[len(uqs)-1].Time {
+		t.Errorf("UpdatedAt got %v; want %v", result.UpdatedAt, uqs[len(uqs)-1].Time)
+	}
+
+	if result.Count != len(uqs) {
+		t.Errorf("Count got %v; want %v", result.Count, len(uqs))
+	}
+
 	return result
 }

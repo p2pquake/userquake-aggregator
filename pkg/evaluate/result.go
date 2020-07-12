@@ -10,6 +10,8 @@ type Confidence float64
 
 type Result struct {
 	StartedAt      epsp.EPSPTime
+	UpdatedAt      epsp.EPSPTime
+	Count          int
 	Confidence     Confidence
 	AreaConfidence map[epsp.AreaCode]AreaResult
 }

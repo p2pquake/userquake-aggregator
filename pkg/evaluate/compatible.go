@@ -160,6 +160,8 @@ type CompatibleEvaluator struct {
 func (c CompatibleEvaluator) Evaluate(r aggregate.Result) Result {
 	result := Result{Confidence: 0, AreaConfidence: map[epsp.AreaCode]AreaResult{}}
 	result.StartedAt = r.StartedAt
+	result.UpdatedAt = r.Userquakes[len(r.Userquakes)-1].Time
+	result.Count = len(r.Userquakes)
 
 	for i := 3; i <= len(r.Userquakes); i++ {
 		u := r.Userquakes[0:i]
