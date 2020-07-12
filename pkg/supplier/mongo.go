@@ -104,19 +104,21 @@ func (m *Mongo) calc() {
 	beginTime := time.Now().Add(-30 * time.Minute).In(loc).Format("2006/01/02 15:04:05.000")
 
 	filters := bson.M{"code": bson.M{"$in": []int{555, 561}}, "time": bson.M{"$gte": beginTime}}
-	opt := options.FindOptions{Sort: bson.D{{"time", int64(1)}}}
+	opt := options.FindOptions{Sort: bson.M{"time": int64(1)}}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
 
 	cur, err := m.collection.Find(ctx, filters, &opt)
 	if err != nil {
-		return
+		log.Fatalf("Find error: %v", err)
 	}
 	defer cur.Close(ctx)
 
 	items := make([]bson.M, 0)
 	cur.All(ctx, &items)
+
+	log.Printf("Aggregate from %v items", len(items))
 
 	// aggregate & evaluate
 	body, err := json.Marshal(items)
