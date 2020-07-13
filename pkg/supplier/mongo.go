@@ -173,6 +173,8 @@ func convert(r evaluate.Result) map[string]interface{} {
 		"count":            r.Count,
 		"confidence":       r.Confidence,
 		"area_confidences": convertAreaConfidence(r.AreaConfidence),
+		"user-agent":       "userquake-aggregator 20200713",
+		"ver":              "20200713",
 	}
 }
 
