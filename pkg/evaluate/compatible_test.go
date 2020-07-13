@@ -375,6 +375,178 @@ func TestAreaConfidence(t *testing.T) {
 	}
 }
 
+func TestAreaConfidence2(t *testing.T) {
+	peers := epsp.Areapeers{
+		Areas: []epsp.Areapeer{
+			{Id: 900, Peer: 71},
+			{Id: 420, Peer: 15},
+			{Id: 250, Peer: 416},
+			{Id: 310, Peer: 4},
+			{Id: 460, Peer: 54},
+			{Id: 205, Peer: 23},
+			{Id: 405, Peer: 24},
+			{Id: 475, Peer: 48},
+			{Id: 241, Peer: 82},
+			{Id: 115, Peer: 15},
+			{Id: 580, Peer: 1},
+			{Id: 560, Peer: 23},
+			{Id: 570, Peer: 5},
+			{Id: 215, Peer: 23},
+			{Id: 231, Peer: 108},
+			{Id: 10, Peer: 51},
+			{Id: 65, Peer: 7},
+			{Id: 150, Peer: 20},
+			{Id: 411, Peer: 26},
+			{Id: 120, Peer: 23},
+			{Id: 430, Peer: 14},
+			{Id: 270, Peer: 184},
+			{Id: 200, Peer: 19},
+			{Id: 240, Peer: 18},
+			{Id: 305, Peer: 2},
+			{Id: 541, Peer: 5},
+			{Id: 225, Peer: 34},
+			{Id: 415, Peer: 20},
+			{Id: 465, Peer: 28},
+			{Id: 143, Peer: 4},
+			{Id: 535, Peer: 16},
+			{Id: 355, Peer: 4},
+			{Id: 675, Peer: 5},
+			{Id: 425, Peer: 58},
+			{Id: 581, Peer: 8},
+			{Id: 320, Peer: 1},
+			{Id: 40, Peer: 2},
+			{Id: 142, Peer: 10},
+			{Id: 125, Peer: 32},
+			{Id: 480, Peer: 14},
+			{Id: 230, Peer: 22},
+			{Id: 525, Peer: 14},
+			{Id: 242, Peer: 5},
+			{Id: 100, Peer: 14},
+			{Id: 655, Peer: 2},
+			{Id: 610, Peer: 1},
+			{Id: 140, Peer: 3},
+			{Id: 330, Peer: 4},
+			{Id: 302, Peer: 19},
+			{Id: 340, Peer: 5},
+			{Id: 325, Peer: 7},
+			{Id: 135, Peer: 12},
+			{Id: 105, Peer: 17},
+			{Id: 50, Peer: 3},
+			{Id: 275, Peer: 29},
+			{Id: 490, Peer: 4},
+			{Id: 110, Peer: 5},
+			{Id: 455, Peer: 22},
+			{Id: 130, Peer: 11},
+			{Id: 615, Peer: 3},
+			{Id: 605, Peer: 5},
+			{Id: 301, Peer: 5},
+			{Id: 350, Peer: 5},
+			{Id: 545, Peer: 2},
+			{Id: 550, Peer: 5},
+			{Id: 141, Peer: 1},
+			{Id: 300, Peer: 4},
+			{Id: 665, Peer: 8},
+			{Id: 901, Peer: 3},
+			{Id: 470, Peer: 6},
+			{Id: 600, Peer: 17},
+			{Id: 905, Peer: 4},
+			{Id: 670, Peer: 5},
+			{Id: 15, Peer: 4},
+			{Id: 315, Peer: 4},
+			{Id: 445, Peer: 4},
+			{Id: 510, Peer: 2},
+			{Id: 416, Peer: 12},
+			{Id: 30, Peer: 3},
+			{Id: 152, Peer: 8},
+			{Id: 651, Peer: 4},
+			{Id: 515, Peer: 1},
+			{Id: 345, Peer: 7},
+			{Id: 151, Peer: 7},
+			{Id: 650, Peer: 4},
+			{Id: 265, Peer: 1},
+			{Id: 55, Peer: 4},
+			{Id: 701, Peer: 3},
+			{Id: 505, Peer: 1},
+			{Id: 500, Peer: 2},
+			{Id: 220, Peer: 2},
+			{Id: 351, Peer: 8},
+			{Id: 70, Peer: 4},
+			{Id: 210, Peer: 4},
+			{Id: 641, Peer: 6},
+			{Id: 410, Peer: 5},
+			{Id: 601, Peer: 3},
+			{Id: 530, Peer: 1},
+			{Id: 111, Peer: 2},
+			{Id: 520, Peer: 2},
+			{Id: 575, Peer: 2},
+			{Id: 25, Peer: 2},
+			{Id: 656, Peer: 1},
+			{Id: 435, Peer: 4},
+			{Id: 75, Peer: 1},
+			{Id: 646, Peer: 1},
+			{Id: 440, Peer: 1},
+			{Id: 576, Peer: 1},
+			{Id: 45, Peer: 1},
+			{Id: 625, Peer: 1},
+			{Id: 495, Peer: 1},
+			{Id: 400, Peer: 1},
+		}}
+
+	result := confidence(
+		peers,
+		[]epsp.Userquake{
+			{Area: 105, Time: genTime("2020/07/13 10:43:28.586")},
+			{Area: 105, Time: genTime("2020/07/13 10:43:43.067")},
+			{Area: 15, Time: genTime("2020/07/13 10:43:44.719")},
+			{Area: 111, Time: genTime("2020/07/13 10:43:57.093")},
+			{Area: 65, Time: genTime("2020/07/13 10:43:59.335")},
+			{Area: 15, Time: genTime("2020/07/13 10:44:04.450")},
+			{Area: 15, Time: genTime("2020/07/13 10:44:15.768")},
+			{Area: 100, Time: genTime("2020/07/13 10:44:18.584")},
+			{Area: 10, Time: genTime("2020/07/13 10:44:24.516")},
+			{Area: 65, Time: genTime("2020/07/13 10:44:37.494")},
+			{Area: 100, Time: genTime("2020/07/13 10:44:43.956")},
+		},
+		2,
+		t,
+	)
+
+	confidenceAreas := map[epsp.AreaCode]string{10: "E", 15: "D", 100: "E", 105: "E", 111: "E"}
+	unconfidenceAreas := []epsp.AreaCode{65}
+
+	if len(confidenceAreas)+len(unconfidenceAreas) != len(result.AreaConfidence) {
+		t.Errorf("result.AreaConfidence length got %v; want %v", len(result.AreaConfidence), len(confidenceAreas))
+	}
+
+	for area, confidence := range confidenceAreas {
+		if _, ok := result.AreaConfidence[area]; !ok {
+			t.Errorf("result(%v) not exist; want exist", area)
+		}
+
+		if result.AreaConfidence[area].Display() != confidence {
+			t.Errorf("result(%v).Display got \"%v\"; want \"%v\"", area, result.AreaConfidence[area].Display(), confidence)
+		}
+
+		if result.AreaConfidence[area].Count <= 0 {
+			t.Errorf("result(%v).Count got \"%v\"; want > 0", area, result.AreaConfidence[area].Count)
+		}
+	}
+
+	for _, area := range unconfidenceAreas {
+		if _, ok := result.AreaConfidence[area]; !ok {
+			t.Errorf("result(%v) not exist; want exist", area)
+		}
+
+		if result.AreaConfidence[area].Display() != "F" {
+			t.Errorf("result(%v).Display got \"%v\"; want \"%v\"", area, result.AreaConfidence[area].Display(), "F")
+		}
+
+		if result.AreaConfidence[area].Count <= 0 {
+			t.Errorf("result(%v).Count got \"%v\"; want > 0", area, result.AreaConfidence[area].Count)
+		}
+	}
+}
+
 func genTime(t string) epsp.EPSPTime {
 	e := epsp.EPSPTime{}
 	e.UnmarshalJSON([]byte("\"" + t + "\""))

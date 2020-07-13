@@ -219,7 +219,7 @@ func calcAreaConfidence(p epsp.Areapeers, us []epsp.Userquake) (result map[epsp.
 				continue
 			}
 
-			if _, ok := result[k]; !ok {
+			if _, ok := result[k]; ok {
 				continue
 			}
 
