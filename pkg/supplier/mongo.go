@@ -140,6 +140,9 @@ func (m *Mongo) calc() {
 
 	for _, r := range aggregationResults {
 		result := evaluate.CompatibleEvaluator{}.Evaluate(r)
+		if time.Since(*result.StartedAt.Time) > 25*time.Minute {
+			continue
+		}
 		evaluationResults = append(evaluationResults, result)
 	}
 
