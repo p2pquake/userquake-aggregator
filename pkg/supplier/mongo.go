@@ -120,7 +120,7 @@ func (m *Mongo) calc() {
 
 	log.Printf("Aggregate from %v items", len(items))
 
-	// aggregate & evaluate
+	// to json
 	body, err := json.Marshal(items)
 	if err != nil {
 		log.Fatalf("JSON marshal error: %v from %v", err, items)
@@ -134,17 +134,7 @@ func (m *Mongo) calc() {
 	}
 
 	// aggregate & evaluate
-	aggregationResults := aggregate.CompatibleAggregator{}.Aggregate(epspRecords)
-
-	evaluationResults := []evaluate.Result{}
-
-	for _, r := range aggregationResults {
-		result := evaluate.CompatibleEvaluator{}.Evaluate(r)
-		if time.Since(*result.StartedAt.Time) > 25*time.Minute {
-			continue
-		}
-		evaluationResults = append(evaluationResults, result)
-	}
+	evaluationResults := aggregateAndEvaluate(epspRecords)
 
 	for _, r := range evaluationResults {
 		// 存在しなければ足す.
@@ -187,4 +177,20 @@ func convertAreaConfidence(a map[epsp.AreaCode]evaluate.AreaResult) map[int]map[
 		r[int(k)] = map[string]interface{}{"confidence": float64(v.Confidence), "count": v.Count, "display": v.Display()}
 	}
 	return r
+}
+
+func aggregateAndEvaluate(r []epsp.Record) []evaluate.Result {
+	aggregationResults := aggregate.CompatibleAggregator{}.Aggregate(r)
+
+	evaluationResults := []evaluate.Result{}
+
+	for _, r := range aggregationResults {
+		result := evaluate.CompatibleEvaluator{}.Evaluate(r)
+		if time.Since(*result.StartedAt.Time) > 25*time.Minute {
+			continue
+		}
+		evaluationResults = append(evaluationResults, result)
+	}
+
+	return evaluationResults
 }
