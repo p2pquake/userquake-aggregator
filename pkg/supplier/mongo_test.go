@@ -75,14 +75,14 @@ func replaceTime(r *[]epsp.Record, f time.Time, t time.Time) {
 	for i := 0; i < len(*r); i++ {
 		v := &(*r)[i]
 		t := v.Time.Time.Add(d)
-		v.Time = epsp.EPSPTime{&t}
+		v.Time.Time = &t
 		if v.Code == 555 {
 			t = v.Areapeers.Time.Time.Add(d)
-			v.Areapeers.Time = epsp.EPSPTime{&t}
+			v.Areapeers.Time.Time = &t
 		}
 		if v.Code == 561 {
 			t = v.Userquake.Time.Time.Add(d)
-			v.Userquake.Time = epsp.EPSPTime{&t}
+			v.Userquake.Time.Time = &t
 		}
 	}
 }
