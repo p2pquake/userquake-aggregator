@@ -1,7 +1,7 @@
-FROM golang:latest as builder
+FROM golang:1.19 as builder
 WORKDIR /go/src
 ADD . /go/src
-RUN CGO_ENABLED=0 go build . && ls -l /go/src
+RUN CGO_ENABLED=0 go build -buildvcs=false . && ls -l /go/src
 
 FROM alpine:latest
 RUN apk --update add tzdata && \
