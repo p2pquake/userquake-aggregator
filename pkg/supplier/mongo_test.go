@@ -18,7 +18,7 @@ func TestMain(m *testing.M) {
 
 func TestAggregateAndEvaluate(t *testing.T) {
 	// empty
-	r := aggregateAndEvaluate([]epsp.Record{})
+	r := (&Mongo{}).aggregateAndEvaluateCached([]epsp.Record{})
 
 	if len(r) != 0 {
 		t.Errorf("Length got %v; want %v", len(r), 0)
@@ -66,7 +66,7 @@ func evaluatePastItems(t *testing.T, body string, lastTime string) []evaluate.Re
 		t.Fatalf("JSON unmarshal error: %v from %v", err, string(body))
 	}
 	replaceTime(&epspRecords, freezeTime, baseTime)
-	return aggregateAndEvaluate(epspRecords)
+	return (&Mongo{}).aggregateAndEvaluateCached(epspRecords)
 }
 
 func replaceTime(r *[]epsp.Record, f time.Time, t time.Time) {

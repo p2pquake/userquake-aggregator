@@ -157,25 +157,61 @@ var areaPositions map[epsp.AreaCode]position = map[epsp.AreaCode]position{
 type CompatibleEvaluator struct {
 }
 
+// peerCtx は 1 回の Evaluate 呼び出し中ずっと不変な areapeers 由来の集計を保持する。
+// ループ内で areapeers を毎回走査する代わりに、ここで一度だけ作って共有する。
+type peerCtx struct {
+	total  int
+	area   map[epsp.AreaCode]int // mp=1
+	pref   map[epsp.AreaCode]int // mp=10
+	region map[epsp.AreaCode]int // mp=100
+}
+
+func newPeerCtx(p epsp.Areapeers) peerCtx {
+	ctx := peerCtx{
+		area:   map[epsp.AreaCode]int{},
+		pref:   map[epsp.AreaCode]int{},
+		region: map[epsp.AreaCode]int{},
+	}
+	for _, a := range p.Areas {
+		ctx.total += a.Peer
+		ctx.area[a.Id] += a.Peer
+		ctx.pref[a.Id/10*10] += a.Peer
+		ctx.region[a.Id/100*100] += a.Peer
+	}
+	return ctx
+}
+
+// uqMap は userquakes を mp 粒度で集計する（旧 toMap の uqs 部分のみ）。
+func uqMap(us []epsp.Userquake, mp int) map[epsp.AreaCode]int {
+	out := map[epsp.AreaCode]int{}
+	for _, u := range us {
+		id := u.Area / epsp.AreaCode(mp) * epsp.AreaCode(mp)
+		out[id]++
+	}
+	return out
+}
+
 func (c CompatibleEvaluator) Evaluate(r aggregate.Result) Result {
 	result := Result{Confidence: 0, AreaConfidence: map[epsp.AreaCode]AreaResult{}}
 	result.StartedAt = r.StartedAt
 	result.UpdatedAt = r.Userquakes[len(r.Userquakes)-1].Time
 	result.Count = len(r.Userquakes)
 
+	ctx := newPeerCtx(r.Areapeers)
+
 	for i := 3; i <= len(r.Userquakes); i++ {
 		u := r.Userquakes[0:i]
-		if c := calcConfidence(r.Areapeers, u); c > result.Confidence {
+		if c := calcConfidence(&ctx, u); c > result.Confidence {
 			result.Confidence = c
 		}
 	}
 
-	result.AreaConfidence = calcAreaConfidence(r.Areapeers, r.Userquakes)
+	result.AreaConfidence = calcAreaConfidence(&ctx, r.Userquakes)
 
 	return result
 }
 
-func calcAreaConfidence(p epsp.Areapeers, us []epsp.Userquake) (result map[epsp.AreaCode]AreaResult) {
+func calcAreaConfidence(ctx *peerCtx, us []epsp.Userquake) (result map[epsp.AreaCode]AreaResult) {
 	result = map[epsp.AreaCode]AreaResult{}
 
 	// 3 件未満は評価対象外とする
@@ -212,9 +248,9 @@ func calcAreaConfidence(p epsp.Areapeers, us []epsp.Userquake) (result map[epsp.
 			}
 		}
 		// 発信数による
-		areas, uqs := toMap(p, u, 1)
+		uqs := uqMap(u, 1)
 		for k, count := range uqs {
-			peers, ok := areas[k]
+			peers, ok := ctx.area[k]
 			if !ok {
 				continue
 			}
@@ -231,12 +267,12 @@ func calcAreaConfidence(p epsp.Areapeers, us []epsp.Userquake) (result map[epsp.
 	}
 
 	for i := 3; i <= len(us); i++ {
-		pArea, uArea := toMap(p, us[0:i], 1)
-		pPref, uPref := toMap(p, us[0:i], 10)
-		pRegion, uRegion := toMap(p, us[0:i], 100)
+		uArea := uqMap(us[0:i], 1)
+		uPref := uqMap(us[0:i], 10)
+		uRegion := uqMap(us[0:i], 100)
 
 		for area, count := range uArea {
-			if _, ok := pArea[area]; !ok {
+			if _, ok := ctx.area[area]; !ok {
 				continue
 			}
 
@@ -245,15 +281,15 @@ func calcAreaConfidence(p epsp.Areapeers, us []epsp.Userquake) (result map[epsp.
 			}
 
 			// 信頼度
-			pc := float64(count) / float64(pArea[area]) * 100
-			if float64(count)/float64(sum(p)) < 0.01 {
-				pc *= float64(count) / float64(sum(p)) * 100
+			pc := float64(count) / float64(ctx.area[area]) * 100
+			if float64(count)/float64(ctx.total) < 0.01 {
+				pc *= float64(count) / float64(ctx.total) * 100
 			} else {
 				pc *= 1.2
 			}
 
-			pc *= float64(uPref[area/10*10])/float64(pPref[area/10*10])*5 + 1
-			pc *= float64(uRegion[area/100*100])/float64(pRegion[area/100*100])*5 + 1
+			pc *= float64(uPref[area/10*10])/float64(ctx.pref[area/10*10])*5 + 1
+			pc *= float64(uRegion[area/100*100])/float64(ctx.region[area/100*100])*5 + 1
 			pc = minF(pc, 100)
 			if pc < 0 {
 				pc = 0
@@ -263,7 +299,7 @@ func calcAreaConfidence(p epsp.Areapeers, us []epsp.Userquake) (result map[epsp.
 		}
 	}
 
-	_, uqs := toMap(p, us, 1)
+	uqs := uqMap(us, 1)
 	for area, count := range uqs {
 		if ar, ok := result[area]; ok {
 			result[area] = AreaResult{Confidence: ar.Confidence, Count: count}
@@ -275,15 +311,15 @@ func calcAreaConfidence(p epsp.Areapeers, us []epsp.Userquake) (result map[epsp.
 	return
 }
 
-func calcConfidence(p epsp.Areapeers, u []epsp.Userquake) Confidence {
+func calcConfidence(ctx *peerCtx, u []epsp.Userquake) Confidence {
 	if len(u) < 3 {
 		return 0
 	}
 
 	speed := float64(len(u)) / (u[len(u)-1].Time.Time.Sub(*u[0].Time.Time)).Seconds()
-	rate := float64(len(u)) / float64(sum(p))
-	areaRate := calcMaxAreaRate(p, u)
-	regionRate := calcMaxRegionRate(p, u)
+	rate := float64(len(u)) / float64(ctx.total)
+	areaRate := calcMaxAreaRate(ctx, u)
+	regionRate := calcMaxRegionRate(u)
 
 	confidences := []Confidence{0.97015, 0.96774, 0.97024, 0.98052}
 	factors := []float64{0.875, 1.0, 1.2, 1.4}
@@ -346,24 +382,16 @@ func minF(values ...float64) float64 {
 	return min
 }
 
-func sum(p epsp.Areapeers) int {
-	peers := 0
-	for _, a := range p.Areas {
-		peers += a.Peer
-	}
-	return peers
-}
-
-func calcMaxAreaRate(p epsp.Areapeers, us []epsp.Userquake) (rate float64) {
+func calcMaxAreaRate(ctx *peerCtx, us []epsp.Userquake) (rate float64) {
 	rate = 0
 
-	areas, uqs := toMap(p, us, 1)
+	uqs := uqMap(us, 1)
 	for area, count := range uqs {
 		if area/100 == 9 {
 			continue
 		}
 
-		if peers, ok := areas[area]; ok {
+		if peers, ok := ctx.area[area]; ok {
 			if r := float64(count) / float64(peers); r > rate {
 				rate = r
 			}
@@ -373,10 +401,10 @@ func calcMaxAreaRate(p epsp.Areapeers, us []epsp.Userquake) (rate float64) {
 	return
 }
 
-func calcMaxRegionRate(p epsp.Areapeers, us []epsp.Userquake) (rate float64) {
+func calcMaxRegionRate(us []epsp.Userquake) (rate float64) {
 	rate = 0
 
-	_, uqs := toMap(p, us, 100)
+	uqs := uqMap(us, 100)
 	for area, count := range uqs {
 		if area/100 == 9 {
 			continue
@@ -385,28 +413,6 @@ func calcMaxRegionRate(p epsp.Areapeers, us []epsp.Userquake) (rate float64) {
 		if r := float64(count) / float64(len(us)); r > rate {
 			rate = r
 		}
-	}
-
-	return
-}
-
-func toMap(p epsp.Areapeers, us []epsp.Userquake, mp int) (areas map[epsp.AreaCode]int, uqs map[epsp.AreaCode]int) {
-	areas = map[epsp.AreaCode]int{}
-	for _, a := range p.Areas {
-		id := a.Id / epsp.AreaCode(mp) * epsp.AreaCode(mp)
-		if _, ok := areas[id]; !ok {
-			areas[id] = 0
-		}
-		areas[id] += a.Peer
-	}
-
-	uqs = map[epsp.AreaCode]int{}
-	for _, u := range us {
-		id := u.Area / epsp.AreaCode(mp) * epsp.AreaCode(mp)
-		if _, ok := uqs[id]; !ok {
-			uqs[id] = 0
-		}
-		uqs[id]++
 	}
 
 	return

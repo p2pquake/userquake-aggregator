@@ -18,7 +18,10 @@ type Config struct {
 	MongoCollection string `envconfig:"mongo_collection" required:"true"`
 }
 
+var mongoDryRun bool
+
 func init() {
+	mongoCmd.Flags().BoolVar(&mongoDryRun, "dry-run", false, "evaluate without writing results back to MongoDB")
 	rootCmd.AddCommand(mongoCmd)
 }
 
@@ -37,13 +40,17 @@ func mongoRun(cmd *cobra.Command, args []string) {
 
 	log.Printf("env: %v", config)
 
-	log.Println("Starting...")
+	if mongoDryRun {
+		log.Println("Starting in dry-run mode: inserts will be logged but not written.")
+	} else {
+		log.Println("Starting...")
+	}
 	ctx, cancel := context.WithCancel(context.Background())
 
-	m := supplier.Mongo{}
+	m := supplier.Mongo{DryRun: mongoDryRun}
 	m.Start(ctx, config.MongoURI, config.MongoDatabase, config.MongoCollection)
 
-	quit := make(chan os.Signal)
+	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 
 L:
