@@ -1,6 +1,8 @@
 package evaluate
 
 import (
+	"time"
+
 	"github.com/p2pquake/userquake-aggregator/pkg/aggregate"
 	"github.com/p2pquake/userquake-aggregator/pkg/epsp"
 )
@@ -157,8 +159,8 @@ var areaPositions map[epsp.AreaCode]position = map[epsp.AreaCode]position{
 type CompatibleEvaluator struct {
 }
 
-// peerCtx は 1 回の Evaluate 呼び出し中ずっと不変な areapeers 由来の集計を保持する。
-// ループ内で areapeers を毎回走査する代わりに、ここで一度だけ作って共有する。
+// peerCtx は 1 クラスタの areapeers 由来の集計を保持する。
+// クラスタ開始時点のピア状況はクラスタの生存期間中ずっと不変なので、一度だけ作って共有する。
 type peerCtx struct {
 	total  int
 	area   map[epsp.AreaCode]int // mp=1
@@ -181,146 +183,269 @@ func newPeerCtx(p epsp.Areapeers) peerCtx {
 	return ctx
 }
 
-// uqMap は userquakes を mp 粒度で集計する（旧 toMap の uqs 部分のみ）。
-func uqMap(us []epsp.Userquake, mp int) map[epsp.AreaCode]int {
-	out := map[epsp.AreaCode]int{}
-	for _, u := range us {
-		id := u.Area / epsp.AreaCode(mp) * epsp.AreaCode(mp)
-		out[id]++
-	}
-	return out
+func (c CompatibleEvaluator) Evaluate(r aggregate.Result) Result {
+	ie := NewIncrementalEvaluator(r.StartedAt, r.Areapeers)
+	ie.Advance(r.Userquakes)
+	return ie.Result()
 }
 
-func (c CompatibleEvaluator) Evaluate(r aggregate.Result) Result {
-	result := Result{Confidence: 0, AreaConfidence: map[epsp.AreaCode]AreaResult{}}
-	result.StartedAt = r.StartedAt
-	result.UpdatedAt = r.Userquakes[len(r.Userquakes)-1].Time
-	result.Count = len(r.Userquakes)
+// IncrementalEvaluator は 1 クラスタの評価を増分的に行う。
+//
+// クラスタは時刻昇順に末尾追記（append-only）で伸びる前提で、Userquake が増えた分だけを処理する。
+// 従来の Evaluate は呼び出しごとにクラスタ全体を O(N^2) で再評価していたが、
+//   - プレフィックス u[0:i] は周期をまたいでも不変（追記のみ）
+//   - ピア状況 peerCtx はクラスタ開始時点で固定
+//
+// という性質を使い、新着 k 件だけを処理することで地震バースト中の負荷を抑える。
+//
+// 1 件追加あたりの処理は、信頼度・表示判定ともに running state を使って償却 O(1)
+// （地域率の走査はたかだか地域数ぶんの定数）で、クラスタ全体では O(N) になる。
+type IncrementalEvaluator struct {
+	started epsp.EPSPTime
+	ctx     peerCtx
 
-	ctx := newPeerCtx(r.Areapeers)
+	// running な userquake 件数（現在処理済みのプレフィックスに対応）
+	countArea   map[epsp.AreaCode]int // mp=1
+	countPref   map[epsp.AreaCode]int // mp=10
+	countRegion map[epsp.AreaCode]int // mp=100
 
-	for i := 3; i <= len(r.Userquakes); i++ {
-		u := r.Userquakes[0:i]
-		if c := calcConfidence(&ctx, u); c > result.Confidence {
-			result.Confidence = c
+	processed int           // 処理済み Userquake 件数
+	first     *time.Time    // u[0].Time（speed 計算用）
+	last      epsp.EPSPTime // u[processed-1].Time（UpdatedAt と整合性チェック用）
+	lastArea  epsp.AreaCode // u[processed-1].Area（整合性チェック用）
+
+	// 全体信頼度: 各プレフィックスを評価した最大値
+	maxAreaRate   float64    // 最大エリア発信率（件数追加で単調非減少なので running max で十分）
+	maxConfidence Confidence // これまでの全プレフィックスでの最大信頼度
+
+	// 表示判定（calcAreaConfidence 相当）: 表示対象エリアの集合と、その座標のバウンディングボックス
+	display map[epsp.AreaCode]struct{}
+	bboxSet bool
+	left    int
+	right   int
+	top     int
+	bottom  int
+}
+
+// NewIncrementalEvaluator はクラスタ開始時刻とピア状況を固定した評価器を作る。
+func NewIncrementalEvaluator(started epsp.EPSPTime, peers epsp.Areapeers) *IncrementalEvaluator {
+	ie := &IncrementalEvaluator{started: started, ctx: newPeerCtx(peers)}
+	ie.reset()
+	return ie
+}
+
+func (ie *IncrementalEvaluator) reset() {
+	ie.countArea = map[epsp.AreaCode]int{}
+	ie.countPref = map[epsp.AreaCode]int{}
+	ie.countRegion = map[epsp.AreaCode]int{}
+	ie.processed = 0
+	ie.first = nil
+	ie.last = epsp.EPSPTime{}
+	ie.lastArea = 0
+	ie.maxAreaRate = 0
+	ie.maxConfidence = 0
+	ie.display = map[epsp.AreaCode]struct{}{}
+	ie.bboxSet = false
+	ie.left, ie.right, ie.top, ie.bottom = 0, 0, 0, 0
+}
+
+// Advance は us のうち未処理の末尾分だけを取り込む。
+// すでに処理済みのプレフィックスが us と矛盾していた場合（順序の入れ替わりや縮小）は、
+// 安全側に倒して最初から作り直す。
+func (ie *IncrementalEvaluator) Advance(us []epsp.Userquake) {
+	if ie.staleAgainst(us) {
+		ie.reset()
+	}
+	for ie.processed < len(us) {
+		ie.step(us[ie.processed])
+	}
+}
+
+// staleAgainst は処理済みプレフィックスと us の先頭・末尾・件数を O(1) で照合する。
+// append-only が崩れている場合のみ true を返す。
+func (ie *IncrementalEvaluator) staleAgainst(us []epsp.Userquake) bool {
+	if ie.processed == 0 {
+		return false
+	}
+	if len(us) < ie.processed {
+		return true
+	}
+	if ie.first == nil || us[0].Time.Time == nil || !us[0].Time.Time.Equal(*ie.first) {
+		return true
+	}
+	last := us[ie.processed-1]
+	if last.Area != ie.lastArea {
+		return true
+	}
+	return ie.last.Time == nil || last.Time.Time == nil || !last.Time.Time.Equal(*ie.last.Time)
+}
+
+// step は Userquake を 1 件取り込み、running state を更新する。
+func (ie *IncrementalEvaluator) step(u epsp.Userquake) {
+	area := u.Area
+	ie.countArea[area]++
+	ie.countPref[area/10*10]++
+	ie.countRegion[area/100*100]++
+
+	if ie.processed == 0 {
+		ie.first = u.Time.Time
+	}
+	ie.processed++
+	ie.last = u.Time
+	ie.lastArea = area
+
+	// 最大エリア発信率を更新（分母 ctx.area は固定なので比は単調非減少）
+	if area/100 != 9 {
+		if peers, ok := ie.ctx.area[area]; ok {
+			if r := float64(ie.countArea[area]) / float64(peers); r > ie.maxAreaRate {
+				ie.maxAreaRate = r
+			}
 		}
 	}
 
-	result.AreaConfidence = calcAreaConfidence(&ctx, r.Userquakes)
+	// 先頭 2 件はかならず表示対象（シード）。信頼度評価・表示判定は 3 件目以降。
+	if ie.processed < 3 {
+		ie.addDisplay(area)
+		return
+	}
 
-	return result
+	// 全体信頼度: このプレフィックスを評価して最大値を更新
+	if c := ie.prefixConfidence(); c > ie.maxConfidence {
+		ie.maxConfidence = c
+	}
+
+	// 表示判定（座標による）: 現在の表示集合のバウンディングボックス内なら最新エリアを追加
+	if _, shown := ie.display[area]; !shown {
+		if pos, ok := areaPositions[area]; ok && ie.bboxSet {
+			if pos.x >= ie.left-allowXRange && pos.x <= ie.right+allowXRange &&
+				pos.y >= ie.top-allowYRange && pos.y <= ie.bottom+allowYRange {
+				ie.addDisplay(area)
+			}
+		}
+	}
+
+	// 表示判定（発信数による）
+	if _, shown := ie.display[area]; !shown {
+		if peers, ok := ie.ctx.area[area]; ok {
+			count := ie.countArea[area]
+			ratio := float64(count) / float64(peers)
+			if (count >= 3 && ratio >= 0.5) || (count >= 5 && ratio >= 0.1) {
+				ie.addDisplay(area)
+			}
+		}
+	}
 }
 
-func calcAreaConfidence(ctx *peerCtx, us []epsp.Userquake) (result map[epsp.AreaCode]AreaResult) {
-	result = map[epsp.AreaCode]AreaResult{}
+// addDisplay はエリアを表示集合に加え、バウンディングボックスを広げる。
+// 座標未登録のエリアは (0,0) として扱う（原実装の bbox 計算と一致させるため）。
+func (ie *IncrementalEvaluator) addDisplay(area epsp.AreaCode) {
+	if _, ok := ie.display[area]; ok {
+		return
+	}
+	ie.display[area] = struct{}{}
 
-	// 3 件未満は評価対象外とする
-	if len(us) < 3 {
+	p := areaPositions[area] // 未登録なら zero value {0, 0}
+	if !ie.bboxSet {
+		ie.left, ie.right, ie.top, ie.bottom = p.x, p.x, p.y, p.y
+		ie.bboxSet = true
+		return
+	}
+	if p.x < ie.left {
+		ie.left = p.x
+	}
+	if p.x > ie.right {
+		ie.right = p.x
+	}
+	if p.y < ie.top {
+		ie.top = p.y
+	}
+	if p.y > ie.bottom {
+		ie.bottom = p.y
+	}
+}
+
+// prefixConfidence は現在のプレフィックス（processed 件）の信頼度を計算する。
+func (ie *IncrementalEvaluator) prefixConfidence() Confidence {
+	n := float64(ie.processed)
+	speed := n / ie.last.Time.Sub(*ie.first).Seconds()
+	rate := n / float64(ie.ctx.total)
+	areaRate := ie.maxAreaRate
+	regionRate := ie.maxRegionRate()
+	return confidenceFromRates(speed, rate, areaRate, regionRate)
+}
+
+// maxRegionRate は現在のプレフィックスでの最大地域発信率（地域件数 / 総件数）を返す。
+// 分母（総件数）が件数追加で増えるため running max にはできないが、地域数は定数なので毎回走査してよい。
+func (ie *IncrementalEvaluator) maxRegionRate() float64 {
+	rate := 0.0
+	for region, count := range ie.countRegion {
+		if region/100 == 9 {
+			continue
+		}
+		if r := float64(count) / float64(ie.processed); r > rate {
+			rate = r
+		}
+	}
+	return rate
+}
+
+// Result は現在の処理済み状態から評価結果を組み立てる。
+func (ie *IncrementalEvaluator) Result() Result {
+	return Result{
+		StartedAt:      ie.started,
+		UpdatedAt:      ie.last,
+		Count:          ie.processed,
+		Confidence:     ie.maxConfidence,
+		AreaConfidence: ie.areaConfidence(),
+	}
+}
+
+// areaConfidence は表示対象エリアごとの信頼度・件数を組み立てる。
+// 原実装ではプレフィックスごとに値を上書きしていたが、最終値は必ず全件（i=N）の計算結果になるため、
+// ここでは確定した全件カウントで一度だけ算出する。
+func (ie *IncrementalEvaluator) areaConfidence() map[epsp.AreaCode]AreaResult {
+	result := map[epsp.AreaCode]AreaResult{}
+	if ie.processed < 3 {
 		return result
 	}
 
-	// 先頭 2 件はかならず表示対象とする
-	for _, u := range us[0:2] {
-		result[u.Area] = AreaResult{Confidence: 0}
-	}
-
-	// 表示判定
-	for i := 3; i <= len(us); i++ {
-		u := us[0:i]
-
-		// 座標による
-		xs := []int{}
-		ys := []int{}
-		for k := range result {
-			xs = append(xs, areaPositions[k].x)
-			ys = append(ys, areaPositions[k].y)
-		}
-
-		left := min(xs)
-		right := max(xs)
-		top := min(ys)
-		bottom := max(ys)
-
-		if pos, ok := areaPositions[u[len(u)-1].Area]; ok {
-			if pos.x >= left-allowXRange && pos.x <= right+allowXRange &&
-				pos.y >= top-allowYRange && pos.y <= bottom+allowYRange {
-				result[u[len(u)-1].Area] = AreaResult{Confidence: 0}
+	for area, count := range ie.countArea {
+		if _, shown := ie.display[area]; shown {
+			conf := Confidence(0)
+			if _, ok := ie.ctx.area[area]; ok {
+				conf = ie.areaConfidenceValue(area)
 			}
-		}
-		// 発信数による
-		uqs := uqMap(u, 1)
-		for k, count := range uqs {
-			peers, ok := ctx.area[k]
-			if !ok {
-				continue
-			}
-
-			if _, ok := result[k]; ok {
-				continue
-			}
-
-			if (count >= 3 && float64(count)/float64(peers) >= 0.5) ||
-				(count >= 5 && float64(count)/float64(peers) >= 0.1) {
-				result[k] = AreaResult{Confidence: 0}
-			}
-		}
-	}
-
-	for i := 3; i <= len(us); i++ {
-		uArea := uqMap(us[0:i], 1)
-		uPref := uqMap(us[0:i], 10)
-		uRegion := uqMap(us[0:i], 100)
-
-		for area, count := range uArea {
-			if _, ok := ctx.area[area]; !ok {
-				continue
-			}
-
-			if _, ok := result[area]; !ok {
-				continue
-			}
-
-			// 信頼度
-			pc := float64(count) / float64(ctx.area[area]) * 100
-			if float64(count)/float64(ctx.total) < 0.01 {
-				pc *= float64(count) / float64(ctx.total) * 100
-			} else {
-				pc *= 1.2
-			}
-
-			pc *= float64(uPref[area/10*10])/float64(ctx.pref[area/10*10])*5 + 1
-			pc *= float64(uRegion[area/100*100])/float64(ctx.region[area/100*100])*5 + 1
-			pc = minF(pc, 100)
-			if pc < 0 {
-				pc = 0
-			}
-
-			result[area] = AreaResult{Confidence: Confidence(pc / 100)}
-		}
-	}
-
-	uqs := uqMap(us, 1)
-	for area, count := range uqs {
-		if ar, ok := result[area]; ok {
-			result[area] = AreaResult{Confidence: ar.Confidence, Count: count}
+			result[area] = AreaResult{Confidence: conf, Count: count}
 		} else {
 			result[area] = AreaResult{Confidence: -1, Count: count}
 		}
 	}
-
-	return
+	return result
 }
 
-func calcConfidence(ctx *peerCtx, u []epsp.Userquake) Confidence {
-	if len(u) < 3 {
-		return 0
+// areaConfidenceValue は表示対象かつピアの存在するエリアの信頼度を、全件カウントから計算する。
+func (ie *IncrementalEvaluator) areaConfidenceValue(area epsp.AreaCode) Confidence {
+	count := ie.countArea[area]
+
+	pc := float64(count) / float64(ie.ctx.area[area]) * 100
+	if float64(count)/float64(ie.ctx.total) < 0.01 {
+		pc *= float64(count) / float64(ie.ctx.total) * 100
+	} else {
+		pc *= 1.2
 	}
 
-	speed := float64(len(u)) / (u[len(u)-1].Time.Time.Sub(*u[0].Time.Time)).Seconds()
-	rate := float64(len(u)) / float64(ctx.total)
-	areaRate := calcMaxAreaRate(ctx, u)
-	regionRate := calcMaxRegionRate(u)
+	pc *= float64(ie.countPref[area/10*10])/float64(ie.ctx.pref[area/10*10])*5 + 1
+	pc *= float64(ie.countRegion[area/100*100])/float64(ie.ctx.region[area/100*100])*5 + 1
+	pc = minF(pc, 100)
+	if pc < 0 {
+		pc = 0
+	}
 
+	return Confidence(pc / 100)
+}
+
+// confidenceFromRates は speed / rate / areaRate / regionRate から信頼度区分を決める。
+func confidenceFromRates(speed, rate, areaRate, regionRate float64) Confidence {
 	confidences := []Confidence{0.97015, 0.96774, 0.97024, 0.98052}
 	factors := []float64{0.875, 1.0, 1.2, 1.4}
 
@@ -352,26 +477,6 @@ func calcConfidence(ctx *peerCtx, u []epsp.Userquake) Confidence {
 	return 0
 }
 
-func max(values []int) int {
-	v := values[0]
-	for _, e := range values {
-		if e > v {
-			v = e
-		}
-	}
-	return v
-}
-
-func min(values []int) int {
-	v := values[0]
-	for _, e := range values {
-		if v > e {
-			v = e
-		}
-	}
-	return v
-}
-
 func minF(values ...float64) float64 {
 	min := values[0]
 	for _, value := range values {
@@ -380,40 +485,4 @@ func minF(values ...float64) float64 {
 		}
 	}
 	return min
-}
-
-func calcMaxAreaRate(ctx *peerCtx, us []epsp.Userquake) (rate float64) {
-	rate = 0
-
-	uqs := uqMap(us, 1)
-	for area, count := range uqs {
-		if area/100 == 9 {
-			continue
-		}
-
-		if peers, ok := ctx.area[area]; ok {
-			if r := float64(count) / float64(peers); r > rate {
-				rate = r
-			}
-		}
-	}
-
-	return
-}
-
-func calcMaxRegionRate(us []epsp.Userquake) (rate float64) {
-	rate = 0
-
-	uqs := uqMap(us, 100)
-	for area, count := range uqs {
-		if area/100 == 9 {
-			continue
-		}
-
-		if r := float64(count) / float64(len(us)); r > rate {
-			rate = r
-		}
-	}
-
-	return
 }

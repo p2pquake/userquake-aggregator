@@ -27,14 +27,7 @@ type Mongo struct {
 	client     *mongo.Client
 	collection *mongo.Collection
 	limiter    *rate.Limiter
-	evalCache  map[evalCacheKey]evaluate.Result
-}
-
-// evalCacheKey は1クラスタの評価結果メモ化キー。
-// 同じ StartedAt かつ件数が同じならクラスタ内容も同一なので、Evaluate を再実行せず使い回せる。
-type evalCacheKey struct {
-	startedAt string
-	count     int
+	evalState  map[string]*evaluate.IncrementalEvaluator
 }
 
 func (m *Mongo) Start(context context.Context, uri string, database string, collection string) {
@@ -84,7 +77,7 @@ func (m *Mongo) run(uri string, db string, c string) {
 		_ = cur.Close(ctx)
 	}()
 
-	m.evalCache = map[evalCacheKey]evaluate.Result{}
+	m.evalState = map[string]*evaluate.IncrementalEvaluator{}
 	m.limiter = rate.NewLimiter(1, m.calc)
 	initial := true
 
@@ -206,8 +199,8 @@ func convert(r evaluate.Result) map[string]interface{} {
 		"count":            r.Count,
 		"confidence":       r.Confidence,
 		"area_confidences": convertAreaConfidence(r.AreaConfidence),
-		"user-agent":       "userquake-aggregator 20260610",
-		"ver":              "20260610",
+		"user-agent":       "userquake-aggregator 20260612",
+		"ver":              "20260612",
 	}
 }
 
@@ -219,36 +212,39 @@ func convertAreaConfidence(a map[epsp.AreaCode]evaluate.AreaResult) map[int]map[
 	return r
 }
 
-// aggregateAndEvaluateCached はクラスタ単位で Evaluate 結果をキャッシュする。
-// 30 分窓から外れたクラスタはこの呼び出しで再構築される newCache に含まれないため、自然に落ちる。
+// aggregateAndEvaluateCached はクラスタ単位で増分評価を行う。
+//
+// クラスタは StartedAt をキーに評価器を保持し、周期ごとに新着 Userquake 分だけを Advance する。
+// これにより、件数が増え続けるアクティブなクラスタでも 1 周期の評価コストが新着件数 k に比例
+// （従来の件数キーのメモ化では伸び続けるクラスタが毎周期フル再評価になっていた）。
+// 30 分窓から外れたクラスタはこの呼び出しで再構築される newState に含まれないため、自然に落ちる。
 func (m *Mongo) aggregateAndEvaluateCached(records []epsp.Record) []evaluate.Result {
 	aggregationResults := aggregate.CompatibleAggregator{}.Aggregate(records)
 
-	newCache := map[evalCacheKey]evaluate.Result{}
+	newState := map[string]*evaluate.IncrementalEvaluator{}
 	evaluationResults := []evaluate.Result{}
 
 	for _, ar := range aggregationResults {
 		if len(ar.Userquakes) == 0 {
 			continue
 		}
-		key := evalCacheKey{
-			startedAt: ar.StartedAt.Time.Format(epspTimeFormat),
-			count:     len(ar.Userquakes),
-		}
+		key := ar.StartedAt.Time.Format(epspTimeFormat)
 
-		result, ok := m.evalCache[key]
-		if !ok {
-			result = evaluate.CompatibleEvaluator{}.Evaluate(ar)
+		ie := m.evalState[key]
+		if ie == nil {
+			ie = evaluate.NewIncrementalEvaluator(ar.StartedAt, ar.Areapeers)
 		}
-		newCache[key] = result
+		ie.Advance(ar.Userquakes)
+		newState[key] = ie
 
+		result := ie.Result()
 		if time.Since(*result.StartedAt.Time) > 25*time.Minute {
 			continue
 		}
 		evaluationResults = append(evaluationResults, result)
 	}
 
-	m.evalCache = newCache
+	m.evalState = newState
 
 	return evaluationResults
 }
